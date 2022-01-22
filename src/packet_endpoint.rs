@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::address::Address;
+use super::address::{Address, AddrInfo};
 use super::wire::{Rx, Tx, Wire, Endpoint, EndpointError};
 use super::packet::Packet;
 
@@ -45,7 +45,7 @@ impl From<EndpointError> for PktEndpointError {
 
 #[derive(Debug)]
 pub struct PktRx<T: Debug + Clone> {
-    addr_info: Arc<AddrInfo>,
+    addr_info: AddrInfo,
     inner: Rx<Packet<T>>,
 }
 
@@ -90,7 +90,7 @@ where
 
 #[derive(Debug)]
 pub struct PktTx<T: Debug + Clone> {
-    addr_info: Arc<AddrInfo>,
+    addr_info: AddrInfo,
     inner: Tx<Packet<T>>,
 }
 
@@ -109,24 +109,8 @@ where
         self.send(pkt)
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct AddrInfo {
-    addr: Address,
-}
-
-impl AddrInfo {
-    fn new(addr: Address) -> Self {
-        Self { addr, }
-    }
-
-    fn get_addr(self: &Arc<Self>) -> Address {
-        self.addr.clone()
-    }
-}
-
 pub struct PktEndpoint<T: Debug + Clone> {
-    addr_info: Arc<AddrInfo>,
+    addr_info: AddrInfo,
     inner: Endpoint<Packet<T>>,
 }
 
@@ -147,7 +131,7 @@ where
         Ok((tx, rx))
     }
 
-    fn from(addr_info: Arc<AddrInfo>, ep: Endpoint<Packet<T>>) -> Self {
+    fn from(addr_info: AddrInfo, ep: Endpoint<Packet<T>>) -> Self {
         Self {
             addr_info,
             inner: ep,
@@ -165,7 +149,6 @@ where
 {
     pub fn endpoints(addr: Address) -> (PktEndpoint<T>, PktEndpoint<T>) {
         let addr_info = AddrInfo::new(addr);
-        let addr_info = Arc::new(addr_info);
         let (ep0, ep1) = Wire::endpoints(); 
         let pkt_ep0 = PktEndpoint::from(addr_info.clone(), ep0);
         let pkt_ep1 = PktEndpoint::from(addr_info, ep1);

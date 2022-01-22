@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::sync::Arc;
 
 use uuid::Uuid;
 
@@ -23,4 +24,25 @@ impl Display for Address {
     }
 }
 
+#[derive(Debug, Clone)]
+struct AddrInfoInner {
+    addr: Address,
+}
+
+#[derive(Debug, Clone)]
+pub struct AddrInfo {
+    inner: Arc<AddrInfoInner>,
+}
+
+impl AddrInfo {
+    pub fn new(addr: Address) -> Self {
+        Self {
+            inner: Arc::new(AddrInfoInner{ addr }),
+        }
+    }
+
+    pub fn get_addr(&self) -> Address {
+        self.inner.addr.clone()
+    }
+}
 
