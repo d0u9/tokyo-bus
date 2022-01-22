@@ -42,5 +42,13 @@ where
     pub fn dst_addr(&self) -> Address {
         self.dst.clone()
     }
+
+    pub fn src_addr_ref(&self) -> &Address {
+        &self.src
+    }
+
+    pub fn src_addr(&self) -> Address {
+        self.src.clone()
+    }
 }
 

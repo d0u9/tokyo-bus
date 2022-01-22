@@ -19,7 +19,7 @@ mod test;
 pub type RawTx<T> = broadcast::Sender<T>;
 pub type RawRx<T> = broadcast::Receiver<T>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EndpointErrKind {
     Timeout,
     NoPeer,
@@ -33,6 +33,33 @@ pub enum EndpointErrKind {
 pub struct EndpointError {
     kind: EndpointErrKind,
     msg: String,
+}
+
+impl EndpointError {
+    pub fn no_peer() -> Self {
+        Self {
+            kind: EndpointErrKind::NoPeer,
+            msg: "no peer endpoint alive".to_string(),
+        }
+    }
+
+    pub fn timeout(time: Duration) -> Self {
+        Self {
+            kind: EndpointErrKind::Timeout,
+            msg: format!("{:?} timeout", time),
+        }
+    }
+
+    pub fn closed() -> Self {
+        Self {
+            kind: EndpointErrKind::Closed,
+            msg: "underlaying channel closed".to_string(),
+        }
+    }
+
+    pub fn kind(&self) -> EndpointErrKind {
+        self.kind
+    }
 }
 
 impl From<broadcast::error::RecvError> for EndpointError {
@@ -60,29 +87,6 @@ where
         Self {
             kind: EndpointErrKind::NoReceiver,
             msg: format!("underlaying channel send error: {:?}", err),
-        }
-    }
-}
-
-impl EndpointError {
-    pub fn no_peer() -> Self {
-        Self {
-            kind: EndpointErrKind::NoPeer,
-            msg: "no peer endpoint alive".to_string(),
-        }
-    }
-
-    pub fn timeout(time: Duration) -> Self {
-        Self {
-            kind: EndpointErrKind::Timeout,
-            msg: format!("{:?} timeout", time),
-        }
-    }
-
-    pub fn closed() -> Self {
-        Self {
-            kind: EndpointErrKind::Closed,
-            msg: "underlaying channel closed".to_string(),
         }
     }
 }

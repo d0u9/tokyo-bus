@@ -5,17 +5,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::address::{Address, AddrInfo};
-use super::wire::{Rx, Tx, Wire, Endpoint, EndpointError};
+use super::wire::{Rx, Tx, Wire, Endpoint, EndpointError, EndpointErrKind};
 use super::packet::Packet;
 
 #[cfg(test)]
 #[path = "unit_tests/packet_endpoint_test.rs"]
 mod test;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PktEndpointErrKind {
     MisDelivery,
-    Endpoint(EndpointError)
+    Endpoint(EndpointErrKind)
 }
 
 #[derive(Debug)]
@@ -32,13 +32,17 @@ impl PktEndpointError {
             msg: format!("packet has dst addr {} which doesn't match endpoint's addr {}", dst_addr, this_addr),
         }
     }
+
+    pub fn kind(&self) -> PktEndpointErrKind {
+        self.kind
+    }
 }
 
 impl From<EndpointError> for PktEndpointError {
     fn from(err: EndpointError) -> Self {
         Self {
             msg: format!("endpoint err: {:?}", err),
-            kind: PktEndpointErrKind::Endpoint(err),
+            kind: PktEndpointErrKind::Endpoint(err.kind()),
         }
     }
 }
@@ -109,6 +113,8 @@ where
         self.send(pkt)
     }
 }
+
+#[derive(Debug)]
 pub struct PktEndpoint<T: Debug + Clone> {
     addr_info: AddrInfo,
     inner: Endpoint<Packet<T>>,
@@ -129,6 +135,10 @@ where
             inner: inner_rx
         };
         Ok((tx, rx))
+    }
+
+    pub fn address(&self) -> Address {
+        self.addr_info.get_addr()
     }
 
     fn from(addr_info: AddrInfo, ep: Endpoint<Packet<T>>) -> Self {
