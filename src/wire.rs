@@ -1,14 +1,20 @@
 use std::clone::Clone;
 use std::convert::From;
 use std::default::Default;
+use std::pin::Pin;
 use std::fmt::Debug;
 use std::ops::Drop;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::task::{Context, Poll};
 
 use log::warn;
+use log::debug;
+use futures::StreamExt;
 use tokio::sync::broadcast;
 use tokio::time::Duration;
+use tokio_stream::wrappers::{self, BroadcastStream};
+use tokio_stream::Stream;
 
 use super::types::DevId;
 
@@ -18,6 +24,7 @@ mod test;
 
 pub type RawTx<T> = broadcast::Sender<T>;
 pub type RawRx<T> = broadcast::Receiver<T>;
+pub type RawRxStream<T> = BroadcastStream<T>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EndpointErrKind {
@@ -91,6 +98,20 @@ where
     }
 }
 
+impl From<wrappers::errors::BroadcastStreamRecvError> for EndpointError
+{
+    fn from(err: wrappers::errors::BroadcastStreamRecvError) -> Self {
+        let (kind, msg) = match &err {
+            wrappers::errors::BroadcastStreamRecvError::Lagged(num) => (
+                EndpointErrKind::Lagged(*num),
+                format!("underlaying channel lagged {} messages", num),
+            ),
+        };
+
+        Self { kind, msg }
+    }
+}
+
 #[derive(Debug)]
 pub struct Rx<T: Debug + Clone> {
     _endpoint: Arc<Endpoint<T>>,
@@ -126,6 +147,49 @@ where
             _ = timer => {
                 Err(EndpointError::timeout(timeout))
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RxStream<T: Debug + Clone> {
+    _endpoint: Arc<Endpoint<T>>,
+    inner: RawRxStream<T>,
+}
+
+impl<T> RxStream<T>
+where
+    T: 'static + Clone + Debug + Send,
+{
+    pub fn new(rx: Rx<T>) -> Self {
+        Self {
+            _endpoint: rx._endpoint,
+            inner: RawRxStream::new(rx.inner),
+        }
+    }
+}
+
+impl<T> Stream for RxStream<T>
+where
+    T: 'static + Clone + Debug + Send,
+{
+    type Item = Result<T, EndpointError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self.inner.poll_next_unpin(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(result)) => {
+                match result {
+                    Err(e) => {
+                        debug!("[RxStream({}) has lagged {} packets, retry", self._endpoint.wire_id(), e);
+                        Poll::Ready(Some(Err(e.into())))
+                    }
+                    Ok(val) => {
+                        Poll::Ready(Some(Ok(val)))
+                    }
+                }
+            }
+            _ => Poll::Ready(None),
         }
     }
 }

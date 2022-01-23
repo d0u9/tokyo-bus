@@ -1,11 +1,17 @@
+use std::task::{Context, Poll};
+use std::pin::Pin;
 use std::convert::From;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::time::Duration;
 
+use log::debug;
+use futures::StreamExt;
+use tokio_stream::Stream;
+
 use super::address::{AddrInfo, Address};
 use super::packet::Packet;
-use super::wire::{Endpoint, EndpointErrKind, EndpointError, Rx, Tx, Wire};
+use super::wire::{Endpoint, EndpointErrKind, EndpointError, Rx, Tx, Wire, RxStream};
 
 #[cfg(test)]
 #[path = "unit_tests/packet_endpoint_test.rs"]
@@ -85,6 +91,56 @@ where
     pub async fn recv_timeout(&mut self, timeout: Duration) -> Result<Packet<T>, PktEndpointError> {
         let pkt = self.inner.recv_timeout(timeout).await?;
         Ok(pkt)
+    }
+}
+
+#[derive(Debug)]
+pub struct PktRxStream<T: Debug + Clone> {
+    inner: RxStream<Packet<T>>,
+}
+
+impl<T> PktRxStream<T>
+where
+    T: 'static + Clone + Debug + Send,
+{
+    pub fn new(rx: PktRx<T>) -> Self {
+        Self {
+            inner: RxStream::new(rx.inner),
+        }
+    }
+}
+
+impl<T> Stream for PktRxStream<T>
+where
+    T: 'static + Clone + Debug + Send,
+{
+    type Item = Result<Packet<T>, PktEndpointError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let result = match self.inner.poll_next_unpin(cx) {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(Some(result)) => {
+                result
+            }
+            _ => return Poll::Ready(None),
+        };
+
+        match result {
+            Err(err) => {
+                match err.kind() {
+                    EndpointErrKind::Lagged(num) => {
+                        debug!("[PktRxStream has lagged {} packets, retry", num);
+                        Poll::Pending
+                    }
+                    _ => {
+                        Poll::Ready(Some(Err(err.into())))
+                    }
+                }
+            }
+            Ok(pkt) => {
+                Poll::Ready(Some(Ok(pkt)))
+            }
+        }
     }
 }
 
