@@ -11,7 +11,7 @@ pub struct Packet<T> {
 
 impl<T> Packet<T>
 where
-    T: Clone + Debug
+    T: Clone + Debug,
 {
     pub fn new(data: T, src_addr: &Address, dst_addr: &Address) -> Self {
         Self {
@@ -26,11 +26,7 @@ where
     }
 
     pub fn into_tuple(self) -> (T, Address, Address) {
-        let Self {
-            payload,
-            src,
-            dst,
-        } = self;
+        let Self { payload, src, dst } = self;
 
         (payload, src, dst)
     }
@@ -51,4 +47,3 @@ where
         self.src.clone()
     }
 }
-

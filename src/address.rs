@@ -10,11 +10,15 @@ pub struct Address {
 
 impl Address {
     pub fn new(addr: &str) -> Self {
-        Self { inner: addr.to_owned() }
+        Self {
+            inner: addr.to_owned(),
+        }
     }
 
     pub fn random() -> Self {
-        Self { inner: Uuid::new_v4().to_string() }
+        Self {
+            inner: Uuid::new_v4().to_string(),
+        }
     }
 }
 
@@ -37,7 +41,7 @@ pub struct AddrInfo {
 impl AddrInfo {
     pub fn new(addr: Address) -> Self {
         Self {
-            inner: Arc::new(AddrInfoInner{ addr }),
+            inner: Arc::new(AddrInfoInner { addr }),
         }
     }
 
@@ -45,4 +49,3 @@ impl AddrInfo {
         self.inner.addr.clone()
     }
 }
-

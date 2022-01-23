@@ -4,9 +4,8 @@
 //
 // use std::mem::drop;
 
-use test_log::test;
-use claim::assert_err;
 use claim::assert_ok;
+use test_log::test;
 use tokio::time::{self, Duration};
 
 use super::*;
@@ -24,7 +23,8 @@ async fn test_packet_endpoint_functional() {
         let pkt = assert_ok!(rx_ep1.recv().await);
         assert_eq!(pkt.into_inner(), test_val);
 
-        assert_err!(rx_ep1.recv().await);
+        let pkt = assert_ok!(rx_ep1.recv().await);
+        assert_eq!(pkt.into_inner(), test_val);
     });
 
     time::sleep(Duration::from_millis(3)).await;
