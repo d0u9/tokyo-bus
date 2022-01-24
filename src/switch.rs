@@ -26,6 +26,7 @@ mod test;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SwitchErrKind {
+    TxClosed,
     TypeMismatch,
     PktEndpoint(PktEndpointErrKind),
     ControlEndpoint(EndpointErrKind),
@@ -70,6 +71,13 @@ impl SwitchError {
             msg: msg.to_owned(),
         }
     }
+
+    pub fn tx_closed() -> Self {
+        Self {
+            kind: SwitchErrKind::TxClosed,
+            msg: "tx closed".to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -101,9 +109,12 @@ where
         self.tx_only
     }
 
-    pub fn send_pkt(&self, pkt: Packet<T>) {
-        if let Err(e) = self.tx.send(pkt) {
-            error!("[{}] port send packet failed: {:?}", self.switch_name(), e);
+    pub fn send_pkt(&self, pkt: Packet<T>) -> Result<(), SwitchError> {
+        if let Err(val) = self.tx.send(pkt) {
+            error!("[{}] port send packet failed: packet = {:?}", self.switch_name(), val);
+            Err(SwitchError::tx_closed())
+        } else {
+            Ok(())
         }
     }
 }
@@ -452,6 +463,9 @@ where
         match pkt_received {
             Err(ref e) if e.err_kind() == PktEndpointErrKind::Endpoint(EndpointErrKind::Closed) => {
                 debug!("[{}] port (addr={}) rx disabled", self.name(), &addr);
+                if let Some(mut port) = self.ports.get_mut(&addr) {
+                    port.tx_only = true;
+                }
                 self.status.rx_port_num -= 1;
             }
             Err(ref e) => {
@@ -475,8 +489,17 @@ where
     fn pkt_switch(&mut self, pkt: Packet<T>) {
         let dst_ref = pkt.dst_addr_ref();
         if let Some(port) = self.ports.get(dst_ref) {
-            trace!("[{}] Packet is sent via port({})", self.name(), dst_ref);
-            port.send_pkt(pkt);
+            trace!("[{}] Packet will be sent via port({})", self.name(), dst_ref);
+
+            // remove port if 1. port is already tx_only; 2. and it has no receivers;
+            let dst_addr = pkt.dst_addr();
+            if let Err(e) = port.send_pkt(pkt) {
+                if e.err_kind() == SwitchErrKind::TxClosed {
+                    if let Some(port) = self.ports.get(&dst_addr) {
+                        (port.tx_only).then(|| self.ports.remove(&dst_addr));
+                    }
+                }
+            }
         } else {
             warn!(
                 "[{}] Packet has a dest addr {} which can not be found",

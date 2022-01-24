@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use log::debug;
+use log::trace;
 use futures::StreamExt;
 use tokio_stream::Stream;
 
@@ -166,6 +167,7 @@ where
     pub fn send_data(&self, dst_addr: &Address, data: T) -> Result<(), PktEndpointError> {
         let src_addr = self.addr_info.get_addr();
         let pkt = Packet::new(data, &src_addr, dst_addr);
+        trace!("A new packet is sent from [{}] to [{}], pkt={:?}", src_addr, dst_addr, pkt);
         self.send(pkt)
     }
 }
