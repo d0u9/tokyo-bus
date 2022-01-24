@@ -100,7 +100,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SwitchHandler<T: Clone + Debug> {
     switch_info: Arc<SwitchInfo>,
     control_endpoint: Endpoint<CtrlMsg<T>>,
