@@ -41,8 +41,12 @@ impl PktEndpointError {
         }
     }
 
-    pub fn kind(&self) -> PktEndpointErrKind {
+    pub fn err_kind(&self) -> PktEndpointErrKind {
         self.kind
+    }
+
+    pub fn err_msg(&self) -> &str {
+        &self.msg
     }
 }
 

@@ -24,7 +24,7 @@ use super::wire::{Endpoint, EndpointErrKind, EndpointError, Rx, Tx, Wire};
 #[path = "unit_tests/switch_test.rs"]
 mod test;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SwitchErrKind {
     TypeMismatch,
     PktEndpoint(PktEndpointErrKind),
@@ -41,7 +41,7 @@ impl From<PktEndpointError> for SwitchError {
     fn from(err: PktEndpointError) -> Self {
         Self {
             msg: format!("packet endpoint failed: {:?}", err),
-            kind: SwitchErrKind::PktEndpoint(err.kind()),
+            kind: SwitchErrKind::PktEndpoint(err.err_kind()),
         }
     }
 }
@@ -56,6 +56,14 @@ impl From<EndpointError> for SwitchError {
 }
 
 impl SwitchError {
+    pub fn err_kind(&self) -> SwitchErrKind {
+        self.kind
+    }
+
+    pub fn err_msg(&self) -> &str {
+        &self.msg
+    }
+
     pub fn type_mismatch(msg: &str) -> Self {
         Self {
             kind: SwitchErrKind::TypeMismatch,
@@ -442,7 +450,7 @@ where
             pkt_received
         );
         match pkt_received {
-            Err(ref e) if e.kind() == PktEndpointErrKind::Endpoint(EndpointErrKind::Closed) => {
+            Err(ref e) if e.err_kind() == PktEndpointErrKind::Endpoint(EndpointErrKind::Closed) => {
                 debug!("[{}] port (addr={}) rx disabled", self.name(), &addr);
                 self.status.rx_port_num -= 1;
             }
